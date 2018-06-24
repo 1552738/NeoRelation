@@ -1,5 +1,7 @@
 package com.bi.neorelation;
 
+
+//import org.neo4j.ogm.json.JSONArray;
 import org.neo4j.driver.v1.*;
 import org.neo4j.driver.v1.Driver;
 import org.neo4j.driver.v1.types.Node;
@@ -11,6 +13,9 @@ import org.springframework.stereotype.Component;
 
 import java.sql.*;
 import java.util.*;
+import com.bi.neorelation.Relation;
+
+import static org.neo4j.driver.v1.Values.parameters;
 
 @Component
 public class Search {
@@ -29,16 +34,15 @@ public class Search {
         Edges = new JSONArray();
         Result = new JSONObject();
         try {
-//            String sql = "match p=(node1:Node{name:{node_name}})";
-            String sql="match p=(node1:Node)";
+            String sql = "match p=(node1:Node{name:{node_name}})";
             if (n_step == 0) {
-                sql = sql + "-[*]->() where node1.name=~'.*"+node_name+".*' return p";
+                sql = sql + "-[*]->() return p";
             } else {
                 for (int i = 1; i < n_step; ++i) sql = sql + "-->()";
-                sql = sql + "-->() where node1.name=~'.*"+node_name+".*' return p";
+                sql = sql + "-->() return p";
             }
-//            StatementResult result = session.run(sql, parameters("node_name", node_name));
-            StatementResult result = session.run(sql);
+            StatementResult result = session.run(sql, parameters("node_name", node_name));
+//            StatementResult result = session.run(sql);
             while (result.hasNext()) {
                 Record record = result.next();
                 List<Value> values = record.values();
@@ -109,13 +113,13 @@ public class Search {
         try {
             String sql = "match p=()";
             if (n_step == 0) {
-                sql = sql + "-[*]->(node1:Node) where node1.name=~'.*"+node_name+".*' return p";
+                sql = sql + "-[*]->(node1:Node{name:{node_name}}) return p";
             } else {
                 for (int i = 1; i < n_step; ++i) sql = sql + "-->()";
-                sql = sql + "-->(node1:Node) where node1.name=~'.*"+node_name+".*' return p";
+                sql = sql + "-->(node1:Node{name:{node_name}}) return p";
             }
-//            StatementResult result = session.run(sql, parameters("node_name", node_name));
-            StatementResult result = session.run(sql);
+            StatementResult result = session.run(sql, parameters("node_name", node_name));
+//            StatementResult result = session.run(sql);
             while (result.hasNext()) {
                 Record record = result.next();
                 List<Value> values = record.values();
@@ -183,16 +187,16 @@ public class Search {
         Edges = new JSONArray();
         Result = new JSONObject();
         try{
-            String sql="match p=(node1:Node)";
+            String sql="match p=(node1:Node{name:{node_name1}})";
             if (n_step==0){
-                sql = sql + "-[*]->(node2:Node)where node1.name=~'.*"+node_name1+".*' and node2.name=~'.*"+node_name2+".*' return p";
+                sql = sql + "-[*]->(node2:Node{name:{node_name2}}) return p";
             }
             else {
                 for (int i=1;i<n_step;++i)sql=sql+"-->()";
-                sql = sql + "-->(node2:Node)where node1.name=~'.*"+node_name1+".*' and node2.name=~'.*"+node_name2+".*' return p";
+                sql = sql + "-->(node2:Node{name:{node_name2}}) return p";
             }
-//            StatementResult result = session.run(sql,parameters("node_name1", node_name1,"node_name2",node_name2));
-            StatementResult result = session.run(sql);
+            StatementResult result = session.run(sql,parameters("node_name1", node_name1,"node_name2",node_name2));
+//            StatementResult result = session.run(sql);
             while (result.hasNext()) {
                 Record record = result.next();
                 List<Value> values = record.values();
@@ -201,7 +205,7 @@ public class Search {
                         Path p = value.asPath();
                         //取出路径中所有点的信息
                         Iterable<Node> nodes = p.nodes();
-                        Integer lev=1;
+                        Integer lev=0;
                         for (Node node : nodes) {
                             nodesMap.put(node.id(), node);
                             nodesSet.add(node.get("name").asString());
@@ -253,6 +257,30 @@ public class Search {
         return new Result(nodesSet,edgesSet,level);
     }
 
+    public Set<String> NodeSearch(String node_name){
+        Set<String> nodesSet = new HashSet<String>();
+        Set<Relation> edgesSet=new HashSet<Relation>();
+        Nodes = new JSONArray();
+        Edges = new JSONArray();
+        Result = new JSONObject();
+        try {
+            String sql = "match (node1:Node) where node1.name=~'.*"+node_name+".*'return node1";
+//            StatementResult result = session.run(sql, parameters("node_name", node_name));
+            StatementResult result = session.run(sql);
+            while (result.hasNext()) {
+                Record record = result.next();
+                List<Value> values = record.values();
+                for (Value value : values) {
+                    Node object=value.asNode();
+                    nodesSet.add(object.get("name").asString());
+                }
+
+            }
+        } catch (Exception e) {
+            System.err.println(e.getClass() + "," + e.getMessage());
+        }
+        return nodesSet;
+    }
     public void shortEstPath() throws Exception {
 //        try {
 //            String cmdSql = "match p=(user1:User{name:\"李明\"})-[*]->(user2:User{name:\"李芳\"}) return p";

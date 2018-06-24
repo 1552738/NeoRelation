@@ -1,11 +1,15 @@
 package com.bi.neorelation;
 
+import jdk.internal.util.xml.XMLStreamException;
 import org.neo4j.shell.util.json.JSONArray;
 import org.neo4j.shell.util.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.TransformerException;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -32,6 +36,9 @@ public class NeoTestController {
     @RequestMapping(value = "/search", method = {RequestMethod.GET, RequestMethod.POST})
     @ResponseBody
     public String search(@RequestParam("entity1")String entity1, @RequestParam("entity2")String entity2, @RequestParam("jump")String jump) throws Exception{
+//        System.out.println(entity1);
+//        System.out.println(entity2);
+//        System.out.println(jump);
         Map<String,Integer> level=new HashMap<>();
         Map<String,Integer> lev=new HashMap<>();
         if(jump.equals(""))
@@ -40,8 +47,8 @@ public class NeoTestController {
 
         String s;
         Result result;
-        Set<String> node=new HashSet<>();
-        Set<Relation> edge=new HashSet<>();
+        Set<String>node=new HashSet<>();
+        Set<Relation>edge=new HashSet<>();
 
         if(entity2.equals("")) {
 //            level.put(entity1,0);
@@ -64,6 +71,10 @@ public class NeoTestController {
                     if ((level.containsKey(name)&&Math.abs(level.get(name))>Math.abs(lev.get(name)))||!level.containsKey(name)){
                         level.put(name,lev.get(name));
                     }
+                }
+
+                if (node.size()==0){
+                    node=search.NodeSearch(entity1);
                 }
             }
         }
@@ -91,6 +102,11 @@ public class NeoTestController {
                     }
                 }
             }
+
+            if (node.size()==0){
+                node=search.NodeSearch(entity1);
+                node.addAll(search.NodeSearch(entity2));
+            }
         }
 
         JSONObject Node, Edge, Result;
@@ -105,11 +121,11 @@ public class NeoTestController {
             Nodes.put(Node);
         }
         for (Relation relation:edge){
-            Edge = new JSONObject();
-            Edge.put("source", relation.getSource());
-            Edge.put("target", relation.getTarget());
-            Edge.put("type", relation.getType());
-            Edges.put(Edge);
+                Edge = new JSONObject();
+                Edge.put("source", relation.getSource());
+                Edge.put("target", relation.getTarget());
+                Edge.put("type", relation.getType());
+                Edges.put(Edge);
         }
         Result.put("nodes", Nodes);
         Result.put("edges", Edges);

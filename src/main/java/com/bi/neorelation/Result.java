@@ -1,5 +1,7 @@
 package com.bi.neorelation;
 
+import org.neo4j.driver.v1.types.Node;
+
 import java.util.Map;
 import java.util.Set;
 
@@ -37,7 +39,7 @@ public class Result {
         this.edge=edge;
     }
 
-    public Result(Set<String>node,Set<Relation>edge,Map<String,Integer>level){
+    public  Result(Set<String>node,Set<Relation>edge,Map<String,Integer>level){
         this.node=node;
         this.edge=edge;
         this.level=level;
