@@ -1,7 +1,5 @@
 package com.bi.neorelation;
 
-
-//import org.neo4j.ogm.json.JSONArray;
 import org.neo4j.driver.v1.*;
 import org.neo4j.driver.v1.Driver;
 import org.neo4j.driver.v1.types.Node;
@@ -13,33 +11,34 @@ import org.springframework.stereotype.Component;
 
 import java.sql.*;
 import java.util.*;
-import com.bi.neorelation.Relation;
-
-import static org.neo4j.driver.v1.Values.parameters;
 
 @Component
 public class Search {
     Driver driver = GraphDatabase.driver("bolt://localhost:7687", AuthTokens.basic("neo4j", "123456"));
+    Connection conn;
     private Session session = driver.session();
     private Map<Long, Node> nodesMap = new HashMap<>();
+    private Map<String,Integer> level=new HashMap<>();
     private JSONObject Node, Edge, Result;
     private JSONArray Nodes, Edges;
 
-    public JSONObject SingleNodePrefixSearch(String node_name, int n_step) throws Exception, SQLException {
+    public Result SingleNodePrefixSearch(String node_name, int n_step) throws Exception, SQLException {
         Set<String> nodesSet = new HashSet<String>();
         Set<Relation> edgesSet=new HashSet<Relation>();
         Nodes = new JSONArray();
         Edges = new JSONArray();
         Result = new JSONObject();
         try {
-            String sql = "match p=(node1:Person{name:{node_name}})";
+//            String sql = "match p=(node1:Node{name:{node_name}})";
+            String sql="match p=(node1:Node)";
             if (n_step == 0) {
-                sql = sql + "-[*]->() return p";
+                sql = sql + "-[*]->() where node1.name=~'.*"+node_name+".*' return p";
             } else {
                 for (int i = 1; i < n_step; ++i) sql = sql + "-->()";
-                sql = sql + "-->() return p";
+                sql = sql + "-->() where node1.name=~'.*"+node_name+".*' return p";
             }
-            StatementResult result = session.run(sql, parameters("node_name", node_name));
+//            StatementResult result = session.run(sql, parameters("node_name", node_name));
+            StatementResult result = session.run(sql);
             while (result.hasNext()) {
                 Record record = result.next();
                 List<Value> values = record.values();
@@ -48,6 +47,7 @@ public class Search {
                         Path p = value.asPath();
                         //取出路径中所有点的信息
                         Iterable<Node> nodes = p.nodes();
+                        Integer lev=0;
                         for (Node node : nodes) {
                             nodesMap.put(node.id(), node);
                             nodesSet.add(node.get("name").asString());
@@ -61,6 +61,13 @@ public class Search {
                             Node startObject = nodesMap.get(startID);
                             Node endObject = nodesMap.get(endID);
                             edgesSet.add(new Relation(startObject.get("name").asString(),endObject.get("name").asString(),rType));
+                            if ((level.containsKey(startObject.get("name").asString())&&level.get(startObject.get("name").asString())>lev)||!level.containsKey(startObject.get("name").asString())){
+                                level.put(startObject.get("name").asString(),lev);
+                            }
+                            ++lev;
+                            if ((level.containsKey(endObject.get("name").asString())&&level.get(endObject.get("name").asString())>lev)||!level.containsKey(endObject.get("name").asString())){
+                                level.put(endObject.get("name").asString(),lev);
+                            }
 //                            asMap 相当于 节点的properties属性信息
 //                            System.out.println(nodesMap.get(startID).keys());
 //                            System.out.println(nodesMap.get(startID).values());
@@ -68,31 +75,32 @@ public class Search {
 //                            System.out.println(nodesMap.get(startID).asMap() + "-" + rType + "-"+nodesMap.get(endID).asMap());
                         }
                     }
-                    System.out.println();
+//                    System.out.println();
                 }
+
             }
-            for (String name : nodesSet) {
-                Node = new JSONObject();
-                Node.put("name", name);
-                Nodes.put(Node);
-            }
-            for (Relation relation:edgesSet){
-                Edge = new JSONObject();
-                Edge.put("source", relation.getSource());
-                Edge.put("target", relation.getTarget());
-                Edge.put("type", relation.getType());
-                Edges.put(Edge);
-            }
-            Result.put("nodes", Nodes);
-            Result.put("edges", Edges);
-            return Result;
+//            for (String name : nodesSet) {
+//                Node = new JSONObject();
+//                Node.put("name", name);
+//                Nodes.put(Node);
+//            }
+//            for (Relation relation:edgesSet){
+//                Edge = new JSONObject();
+//                Edge.put("source", relation.getSource());
+//                Edge.put("target", relation.getTarget());
+//                Edge.put("type", relation.getType());
+//                Edges.put(Edge);
+//            }
+//            Result.put("nodes", Nodes);
+//            Result.put("edges", Edges);
+//            return Result;
         } catch (Exception e) {
             System.err.println(e.getClass() + "," + e.getMessage());
         }
-        return null;
+        return new Result(nodesSet,edgesSet,level);
     }
 
-    public JSONObject SingleNodeSuffixSearch(String node_name,int n_step) throws Exception,SQLException {
+    public Result SingleNodeSuffixSearch(String node_name,int n_step) throws Exception,SQLException {
         Set<String> nodesSet = new HashSet<String>();
         Set<Relation> edgesSet = new HashSet<Relation>();
         Nodes = new JSONArray();
@@ -101,18 +109,20 @@ public class Search {
         try {
             String sql = "match p=()";
             if (n_step == 0) {
-                sql = sql + "-[*]->(node1:Person{name:{node_name}}) return p";
+                sql = sql + "-[*]->(node1:Node) where node1.name=~'.*"+node_name+".*' return p";
             } else {
                 for (int i = 1; i < n_step; ++i) sql = sql + "-->()";
-                sql = sql + "-->(node1:Person{name:{node_name}}) return p";
+                sql = sql + "-->(node1:Node) where node1.name=~'.*"+node_name+".*' return p";
             }
-            StatementResult result = session.run(sql, parameters("node_name", node_name));
+//            StatementResult result = session.run(sql, parameters("node_name", node_name));
+            StatementResult result = session.run(sql);
             while (result.hasNext()) {
                 Record record = result.next();
                 List<Value> values = record.values();
                 for (Value value : values) {
                     if (value.type().name().equals("PATH")) {
                         Path p = value.asPath();
+                        Integer lev=0-n_step;
                         //取出路径中所有点的信息
                         Iterable<Node> nodes = p.nodes();
                         for (Node node : nodes) {
@@ -128,6 +138,13 @@ public class Search {
                             Node startObject = nodesMap.get(startID);
                             Node endObject = nodesMap.get(endID);
                             edgesSet.add(new Relation(startObject.get("name").asString(), endObject.get("name").asString(), rType));
+                            if ((level.containsKey(startObject.get("name").asString())&&Math.abs(level.get(startObject.get("name").asString()))>Math.abs(lev))||!level.containsKey(startObject.get("name").asString())){
+                                level.put(startObject.get("name").asString(),lev);
+                            }
+                            ++lev;
+                            if ((level.containsKey(endObject.get("name").asString())&&Math.abs(level.get(endObject.get("name").asString()))>Math.abs(lev))||!level.containsKey(endObject.get("name").asString())){
+                                level.put(endObject.get("name").asString(),lev);
+                            }
 //                            asMap 相当于 节点的properties属性信息
 //                            System.out.println(nodesMap.get(startID).keys());
 //                            System.out.println(nodesMap.get(startID).values());
@@ -135,46 +152,47 @@ public class Search {
 //                            System.out.println(nodesMap.get(startID).asMap() + "-" + rType + "-"+nodesMap.get(endID).asMap());
                         }
                     }
-                    System.out.println();
+//                    System.out.println();
                 }
             }
-            for (String name : nodesSet) {
-                Node = new JSONObject();
-                Node.put("name", name);
-                Nodes.put(Node);
-            }
-            for (Relation relation : edgesSet) {
-                Edge = new JSONObject();
-                Edge.put("source", relation.getSource());
-                Edge.put("target", relation.getTarget());
-                Edge.put("type", relation.getType());
-                Edges.put(Edge);
-            }
-            Result.put("nodes", Nodes);
-            Result.put("edges", Edges);
-            return Result;
+//            for (String name : nodesSet) {
+//                Node = new JSONObject();
+//                Node.put("name", name);
+//                Nodes.put(Node);
+//            }
+//            for (Relation relation : edgesSet) {
+//                Edge = new JSONObject();
+//                Edge.put("source", relation.getSource());
+//                Edge.put("target", relation.getTarget());
+//                Edge.put("type", relation.getType());
+//                Edges.put(Edge);
+//            }
+//            Result.put("nodes", Nodes);
+//            Result.put("edges", Edges);
+//            return Result;
         } catch (Exception e) {
             System.err.println(e.getClass() + "," + e.getMessage());
         }
-        return null;
+        return new Result(nodesSet,edgesSet,level);
     }
 
-    public JSONObject DoubleNodeSearch(String node_name1,String node_name2,int n_step)throws Exception,SQLException{
+    public Result DoubleNodeSearch(String node_name1,String node_name2,int n_step)throws Exception,SQLException{
         Set<String> nodesSet = new HashSet<String>();
         Set<Relation> edgesSet=new HashSet<Relation>();
         Nodes = new JSONArray();
         Edges = new JSONArray();
         Result = new JSONObject();
         try{
-            String sql="match p=(user1:Person{name:{node_name1}})";
+            String sql="match p=(node1:Node)";
             if (n_step==0){
-                sql = sql + "-[*]->(user2:Person{name:{node_name2}}) return p";
+                sql = sql + "-[*]->(node2:Node)where node1.name=~'.*"+node_name1+".*' and node2.name=~'.*"+node_name2+".*' return p";
             }
             else {
                 for (int i=1;i<n_step;++i)sql=sql+"-->()";
-                sql = sql + "-->(user2:Person{name:{node_name2}}) return p";
+                sql = sql + "-->(node2:Node)where node1.name=~'.*"+node_name1+".*' and node2.name=~'.*"+node_name2+".*' return p";
             }
-            StatementResult result = session.run(sql,parameters("node_name1", node_name1,"node_name2",node_name2));
+//            StatementResult result = session.run(sql,parameters("node_name1", node_name1,"node_name2",node_name2));
+            StatementResult result = session.run(sql);
             while (result.hasNext()) {
                 Record record = result.next();
                 List<Value> values = record.values();
@@ -183,6 +201,7 @@ public class Search {
                         Path p = value.asPath();
                         //取出路径中所有点的信息
                         Iterable<Node> nodes = p.nodes();
+                        Integer lev=1;
                         for (Node node : nodes) {
                             nodesMap.put(node.id(), node);
                             nodesSet.add(node.get("name").asString());
@@ -196,6 +215,13 @@ public class Search {
                             Node startObject = nodesMap.get(startID);
                             Node endObject = nodesMap.get(endID);
                             edgesSet.add(new Relation(startObject.get("name").asString(), endObject.get("name").asString(), rType));
+                            if ((level.containsKey(startObject.get("name").asString())&&level.get(startObject.get("name").asString())>lev)||!level.containsKey(startObject.get("name").asString())){
+                                level.put(startObject.get("name").asString(),lev);
+                            }
+                            ++lev;
+                            if ((level.containsKey(endObject.get("name").asString())&&level.get(endObject.get("name").asString())>lev)||!level.containsKey(endObject.get("name").asString())){
+                                level.put(endObject.get("name").asString(),lev);
+                            }
 //                            asMap 相当于 节点的properties属性信息
 //                            System.out.println(nodesMap.get(startID).keys());
 //                            System.out.println(nodesMap.get(startID).values());
@@ -203,28 +229,28 @@ public class Search {
 //                            System.out.println(nodesMap.get(startID).asMap() + "-" + rType + "-"+nodesMap.get(endID).asMap());
                         }
                     }
-                    System.out.println();
+//                    System.out.println();
                 }
             }
-            for (String name : nodesSet) {
-                Node = new JSONObject();
-                Node.put("name", name);
-                Nodes.put(Node);
-            }
-            for (Relation relation : edgesSet) {
-                Edge = new JSONObject();
-                Edge.put("source", relation.getSource());
-                Edge.put("target", relation.getTarget());
-                Edge.put("type", relation.getType());
-                Edges.put(Edge);
-            }
-            Result.put("nodes", Nodes);
-            Result.put("edges", Edges);
-            return Result;
+//            for (String name : nodesSet) {
+//                Node = new JSONObject();
+//                Node.put("name", name);
+//                Nodes.put(Node);
+//            }
+//            for (Relation relation : edgesSet) {
+//                Edge = new JSONObject();
+//                Edge.put("source", relation.getSource());
+//                Edge.put("target", relation.getTarget());
+//                Edge.put("type", relation.getType());
+//                Edges.put(Edge);
+//            }
+//            Result.put("nodes", Nodes);
+//            Result.put("edges", Edges);
+//            return Result;
         } catch (Exception e) {
             System.err.println(e.getClass() + "," + e.getMessage());
         }
-        return null;
+        return new Result(nodesSet,edgesSet,level);
     }
 
     public void shortEstPath() throws Exception {

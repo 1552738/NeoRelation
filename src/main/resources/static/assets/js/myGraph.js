@@ -13,21 +13,26 @@ function search() {
 
             var graph = JSON.parse(data);
 
-            // var categories = [];
-            // categories[0] = { name: '导演' };
-            // categories[1] = { name: '演员' };
+            var categories = [];
+            categories[0] = { name: 'found' };
+            categories[1] = { name: 'prefix' };
+            categories[2] = { name: 'suffix' };
 
             graph.nodes.forEach(function (node) {
-                // node.itemStyle = null;
-                // node.category = node.attributes.modularity_class;
-                if(node.name === entity1 || node.name === entity2) {
-                    // node.symbolSize = 40;
-                    node.itemStyle = { color: '#283593'};
+                if(Math.abs(node.level) < 5) {
+                    node.symbolSize = 60-10*(Math.abs(node.level)-1);
+                }
+                if(node.level > 0) {
+                    node.category = 1;
+                }
+                else if(node.level < 0) {
+                    node.category = 2;
+                }
+                else {
+                    node.category = 0;
+                    // node.itemStyle = { color: '#c62828'};
                 }
                 // node.value = node.symbolSize;
-                // Use random x, y
-                // node.x = node.y = null;
-                // node.draggable = true;
             });
 
             option = {
@@ -41,16 +46,23 @@ function search() {
                         if (param.dataType === 'edge') {
                             return param.data.source + ' > ' + param.data.target + ': ' + param.data.type;
                         }
-                        return 'node: ' + param.data.name;
+                        return param.data.name + '  ' + param.data.level;
                     }
                 },
-                // legend: [{
-                //     // selectedMode: 'single',
-                //     data: categories.map(function (a) {
-                //         return a.name;
-                //     })
-                // }],
-                // animation: false,
+                toolbox: {
+                    show : true,
+                    feature : {
+                        dataView: {show: true, readOnly: false},
+                        restore : {show: true},
+                        saveAsImage : {show: true}
+                    }
+                },
+                legend: [{
+                    // selectedMode: 'single',
+                    data: categories.map(function (a) {
+                        return a.name;
+                    })
+                }],
                 animationEasingUpdate: "quinticInOut",
                 animationDurationUpdate: 100,
                 series : [
@@ -59,10 +71,10 @@ function search() {
                         type: 'graph',
                         layout: 'force',
                         draggable: true,
-                        symbolSize: 30,
+                        symbolSize: 20,
                         data: graph.nodes,
                         links: graph.edges,
-                        // categories: categories,
+                        categories: categories,
                         roam: true,
                         focusNodeAdjacency: true,
                         lineStyle: {
@@ -92,10 +104,9 @@ function search() {
                             }
                         },
                         edgeSymbol: ['none', 'arrow'],
-                        // edgeSymbolSize: [4, 10],
                         force: {
-                            edgeLength: [100,200],
-                            repulsion: 100
+                            edgeLength: [200, 300],
+                            repulsion: 200
                         }
                     }
                 ]
@@ -107,5 +118,4 @@ function search() {
             }
         }
     });
-
 }
